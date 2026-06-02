@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "adas-infra-bench"
+version = "0.1.0"
+description = "Hardware benchmarks and throughput measurements"
+requires-python = ">=3.11"
+dependencies = [
+    "adas-infra-core",
+    "adas-infra-data",
+    "ray[data]>=2.23.0",
+    "pytest-benchmark>=4.0.0",
+    "numpy>=1.26.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/adas_infra"]
+
+[tool.hatch.build]
+sources = ["src"]

@@ -1,0 +1,6 @@
+# Local Ray config: 2 CPUs → real cross-process Plasma (§0.5).
+# num_cpus=2 spawns a real worker process so zero-copy semantics materialise.
+# Single-process (num_cpus=1) is NOT a supported profile.
+num_cpus: 2
+object_store_memory_mb: 512
+dashboard_host: "127.0.0.1"

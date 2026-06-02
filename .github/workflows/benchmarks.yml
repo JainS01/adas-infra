@@ -1,0 +1,31 @@
+name: Benchmarks — Plasma throughput regression gate
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: Plasma throughput benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv sync
+      - name: Run benchmarks with regression check
+        run: |
+          uv run pytest tests/benchmarks/ \
+            --benchmark-json=tests/benchmarks/results.json \
+            --benchmark-min-rounds=3 \
+            -v --timeout=120
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: tests/benchmarks/results.json

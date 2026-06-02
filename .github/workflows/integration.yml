@@ -1,0 +1,21 @@
+name: Integration Tests — Ray + delta pipeline
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  integration:
+    name: Integration tests (CPU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv sync
+      - name: Run integration tests (skip GPU-gated)
+        run: uv run pytest tests/integration/ -v --tb=short -m "not gpu" --timeout=120

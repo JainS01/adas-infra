@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "adas-infra-serve"
+version = "0.1.0"
+description = "Model registry, export, and inference endpoints"
+requires-python = ">=3.11"
+dependencies = [
+    "adas-infra-core",
+    "adas-infra-train",
+    "torch>=2.3.0",
+    "mlflow>=2.13.0",
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+    "pillow>=10.0.0",
+    "numpy>=1.26.0",
+    "pydantic>=2.7.0",
+    "prometheus-client>=0.20.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/adas_infra"]
+
+[tool.hatch.build]
+sources = ["src"]

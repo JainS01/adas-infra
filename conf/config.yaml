@@ -1,0 +1,18 @@
+# Root Hydra composition — all values can be overridden from the CLI.
+# Default profile: local_mock (judge/CI path — no cloud, no GPU required).
+
+defaults:
+  - _self_
+  - profile: local_mock        # Switch to cloud_prod for Azure
+  - data: synthetic_local      # Dataset configuration
+  - model: fusion_baseline     # Model architecture
+  - trainer: single_node_debug # Training engine
+  - storage: local_nvme        # Storage backend
+  - ray: local_2worker         # Ray cluster config
+  - manifest: sqlite           # Manifest store
+  - serve: local_fastapi       # Inference endpoint
+  - registry: mlflow_local     # Model registry
+  - observability: prometheus  # Metrics configuration
+
+# Global seed for reproducibility
+seed: 42

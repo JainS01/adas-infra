@@ -1,0 +1,1 @@
+"""Run manifest construction."""

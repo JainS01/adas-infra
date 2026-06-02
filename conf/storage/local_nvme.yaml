@@ -1,0 +1,4 @@
+# Local filesystem storage (NVME / laptop / CI).
+_target_: adas_infra.data.ingestion.local_parquet_ingestor.LocalParquetIngestor
+storage_root: ./data/synthetic
+state_dir: ./state

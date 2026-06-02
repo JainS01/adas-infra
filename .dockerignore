@@ -1,0 +1,15 @@
+**/.venv
+**/__pycache__
+**/*.pyc
+**/*.egg-info
+mlruns/
+state/
+checkpoints/
+data/
+.env.local
+.last_run_id
+.last_model_path
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+tests/benchmarks/results.json

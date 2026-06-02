@@ -1,0 +1,3 @@
+# SQLite manifest store — local file (judge path).
+_target_: adas_infra.data.delta.manifest_store_sqlite.ManifestStoreSQLite
+db_path: ./state/manifest.db

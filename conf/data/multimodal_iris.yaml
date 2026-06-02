@@ -1,0 +1,8 @@
+# Kaggle iris+fingerprint dataset config.
+# Dataset: ninadmehendale/multimodal-iris-fingerprint-biometric-data
+# Download to ADAS_DATA_ROOT before using this config.
+
+ingestor: iris_fingerprint
+root: ${oc.env:ADAS_DATA_ROOT,./data/kaggle}
+num_shards: 32
+seed: 42

@@ -1,0 +1,15 @@
+# local_mock profile — judge path, no cloud account, no GPU required.
+# Every cloud adapter is replaced with a local twin behind the same contract.
+# Activated by default or via: +profile=local_mock
+
+# Override defaults to local implementations
+defaults:
+  - override /data: synthetic_local
+  - override /storage: local_nvme
+  - override /ray: local_2worker
+  - override /manifest: sqlite
+  - override /serve: local_fastapi
+  - override /registry: mlflow_local
+  - override /trainer: single_node_debug
+
+profile_name: local_mock

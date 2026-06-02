@@ -1,0 +1,4 @@
+# Cloud Ray cluster — multi-node autoscale on AKS.
+address: ${oc.env:RAY_CLUSTER_ADDRESS}
+num_cpus: 0           # 0 = inherit from cluster
+object_store_memory_mb: 0

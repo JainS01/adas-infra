@@ -1,0 +1,88 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": { "list": [] },
+  "description": "ADAS Training SLO — dataloader lag, GPU efficiency, Plasma pressure",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, rate(dataloader_lag_seconds_bucket[1m]))",
+          "legendFormat": "p99 lag",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, rate(dataloader_lag_seconds_bucket[1m]))",
+          "legendFormat": "p50 lag",
+          "refId": "B"
+        }
+      ],
+      "title": "Dataloader Lag (Plasma → TrainLoop)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "gpu_efficiency_percent",
+          "legendFormat": "GPU {{device_index}}",
+          "refId": "A"
+        }
+      ],
+      "title": "GPU Utilisation (NVML)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "rate(plasma_spill_events_total[1m])",
+          "legendFormat": "spill rate",
+          "refId": "A"
+        }
+      ],
+      "title": "Plasma Spill Rate (leading indicator of memory pressure)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["adas", "training"],
+  "templating": { "list": [] },
+  "time": { "from": "now-30m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "ADAS Training SLO",
+  "uid": "adas-training-slo",
+  "version": 1
+}

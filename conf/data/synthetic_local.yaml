@@ -1,0 +1,9 @@
+# Synthetic data config — generates deterministic fake biometric data on-the-fly.
+# No Kaggle download required; covers the entire judge path.
+
+ingestor: synthetic
+root: ./data/synthetic
+num_subjects: 20
+samples_per_subject: 5
+num_shards: 4
+seed: 42

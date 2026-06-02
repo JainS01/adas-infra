@@ -1,0 +1,5 @@
+# Azure Blob Storage — secrets via env vars only (never committed).
+_target_: adas_infra.data.ingestion.azure_blob_ingestor.AzureBlobIngestor
+connection_string: ${oc.env:AZURE_STORAGE_CONN_STR}
+container_name: ${oc.env:AZURE_BLOB_CONTAINER}
+state_dir: ${oc.env:ADAS_STATE_DIR,./state}

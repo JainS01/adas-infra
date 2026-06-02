@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "adas-infra"
+version = "0.1.0"
+description = "ADAS Multimodal AI Infrastructure — scalable MLOps platform for L2+ ADAS"
+requires-python = ">=3.11"
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-benchmark>=4.0.0",
+    "pytest-timeout>=2.3.0",
+    "hypothesis>=6.100.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+    "bandit[toml]>=1.7.9",
+    "pre-commit>=3.7.0",
+    "types-Pillow>=10.2.0",
+    "types-requests>=2.32.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["packages/*/src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "ANN", "S", "B", "A", "C4", "PT", "RUF"]
+ignore = ["ANN101", "ANN102", "ANN401", "S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN", "S"]
+"scripts/**" = ["ANN", "S"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+namespace_packages = true
+explicit_package_bases = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+timeout = 200
+markers = [
+    "gpu: marks tests that require GPU",
+    "slow: marks tests that take >10s",
+    "e2e: end-to-end pipeline tests",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "scripts"]
+skips = ["B101"]

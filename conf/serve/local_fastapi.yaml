@@ -1,0 +1,5 @@
+# Local FastAPI inference endpoint.
+_target_: adas_infra.serve.inference.local_fastapi_endpoint.serve
+model_path: ./checkpoints/fusion.pt
+port: 8080
+host: "0.0.0.0"

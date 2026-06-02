@@ -1,0 +1,11 @@
+# Single-device engine — CPU or 1 GPU (judge / CI path).
+# max_steps=50 is enough for the e2e test to pass in <180s on CPU.
+
+_target_: adas_infra.train.engines.single_device_engine.SingleDeviceEngine
+seed: 42
+max_steps: 50
+batch_size: 16
+lr: 0.001
+weight_decay: 0.0001
+checkpoint_dir: ./checkpoints
+profile: local_mock

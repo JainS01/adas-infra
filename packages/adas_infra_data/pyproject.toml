@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "adas-infra-data"
+version = "0.1.0"
+description = "Data orchestration: ingestion, delta/WAL, Ray data plane, transforms"
+requires-python = ">=3.11"
+dependencies = [
+    "adas-infra-core",
+    "pyarrow>=16.0.0",
+    "ray[data]>=2.23.0",
+    "numpy>=1.26.0",
+    "pillow>=10.0.0",
+    "watchdog>=4.0.0",
+    "sqlalchemy>=2.0.0",
+    "pydantic>=2.7.0",
+]
+
+[project.optional-dependencies]
+blake3 = ["blake3>=0.4.1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/adas_infra"]
+
+[tool.hatch.build]
+sources = ["src"]

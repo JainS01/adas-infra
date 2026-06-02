@@ -1,0 +1,3 @@
+# MLflow local file-based registry (local_mock profile).
+_target_: adas_infra.serve.registry.mlflow_local_registry.MLflowLocalRegistry
+tracking_uri: file:./mlruns

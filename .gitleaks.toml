@@ -1,0 +1,20 @@
+[extend]
+useDefault = true
+
+[[rules]]
+description = "Azure Storage Connection String"
+id = "azure-storage-conn-str"
+regex = '''DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[A-Za-z0-9/+=]{88}'''
+tags = ["azure", "storage"]
+
+[[rules]]
+description = "Azure SAS Token"
+id = "azure-sas-token"
+regex = '''sv=\d{4}-\d{2}-\d{2}&ss=[a-z]+&srt=[a-z]+&sp=[a-z]+'''
+tags = ["azure", "sas"]
+
+[allowlist]
+paths = [
+    "conf/.env.example",
+    ".gitleaks.toml",
+]

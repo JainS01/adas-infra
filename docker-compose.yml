@@ -1,0 +1,44 @@
+version: "3.9"
+
+# Judge stack — runs on a laptop with no cloud account, no GPU.
+# `docker compose up -d` starts Prometheus + Grafana.
+# The training container is run separately via `make judge-quickstart`.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: adas-prometheus
+    volumes:
+      - ./docker/local-obs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=24h"
+    restart: unless-stopped
+    networks:
+      - obs-net
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: adas-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/training_slo.json
+    volumes:
+      - ./docker/local-obs/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./docker/local-obs/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./packages/adas_infra_obs/src/adas_infra/obs/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - obs-net
+
+networks:
+  obs-net:
+    driver: bridge

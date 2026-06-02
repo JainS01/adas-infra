@@ -1,0 +1,20 @@
+# cloud_prod profile — Azure Blob + Azure ML + multi-node Ray.
+# Secrets MUST be supplied via ${oc.env:VAR} — never hardcoded.
+
+defaults:
+  - override /storage: azure_blob
+  - override /ray: cluster_autoscale
+  - override /manifest: postgres
+  - override /serve: azureml_online
+  - override /registry: azureml_registry
+  - override /trainer: ddp_h100
+
+profile_name: cloud_prod
+
+# Azure credentials — all resolved from environment variables at runtime
+azure:
+  storage_account: ${oc.env:AZURE_STORAGE_ACCOUNT}
+  container: ${oc.env:AZURE_BLOB_CONTAINER}
+  subscription_id: ${oc.env:AZURE_SUBSCRIPTION_ID}
+  resource_group: ${oc.env:AZURE_RESOURCE_GROUP}
+  workspace: ${oc.env:AZURE_ML_WORKSPACE}

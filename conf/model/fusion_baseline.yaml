@@ -1,0 +1,9 @@
+# FusionBaseline model — two-tower CNN with late fusion.
+# num_classes is overridden at runtime from the dataset.
+
+name: fusion_baseline
+_target_: adas_infra.train.models.fusion_baseline.FusionBaseline
+num_classes: 20           # overridden at runtime from dataset
+iris_embed_dim: 128
+fp_embed_dim: 128
+dropout: 0.3
