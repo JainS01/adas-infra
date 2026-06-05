@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-import shutil
-import tempfile
+import os
 from pathlib import Path
-from typing import Generator
 
 import pytest
+
+# Ray spawns worker processes that must `import ray`. When the suite is launched via
+# `uv run pytest` (the CI invocation), Ray's uv-run runtime-env propagation rebuilds a
+# fresh venv per worker that resolves against the root dev group — which has no `ray` —
+# so workers crash with ModuleNotFoundError and the driver hangs until timeout. Disabling
+# the propagation makes workers reuse the current interpreter (which has ray installed).
+# Must be set before any `import ray`; conftest is imported before test modules are
+# collected. Mirrors the identical guard in packages/adas_infra_train/src/pipeline.py.
+os.environ.setdefault("RAY_ENABLE_UV_RUN_RUNTIME_ENV", "0")
 
 
 @pytest.fixture(scope="session")

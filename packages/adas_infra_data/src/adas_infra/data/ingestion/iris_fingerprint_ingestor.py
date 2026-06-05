@@ -16,8 +16,8 @@ A MissingModalityError is raised (not silently skipped) for any incomplete pair.
 
 from __future__ import annotations
 
-import io
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -59,45 +59,67 @@ class IrisFingerprintIngestor:
         return sorted(iris_subjects & fp_subjects)
 
     def ingest(self, shard_ids: list[str]) -> pa.Table:
-        """Build an Arrow table for the requested subject shard IDs."""
+        """Build an Arrow table for the requested subject shard IDs.
+
+        Single pass: each image's bytes are read exactly once (the previous
+        implementation consumed the sample generator a second time merely to
+        count rows, reading every iris file twice).
+
+        Splits are stratified **per subject**: every subject contributes its own
+        train/val/test slice, so each identity is guaranteed to appear in the
+        training set. A global row-index split instead placed entire (early)
+        subjects exclusively in val/test, making those subjects unlearnable.
+        """
         all_subjects = set(self.list_shards())
-        rows: list[dict] = []  # type: ignore[type-arg]
-        total = sum(1 for sid in shard_ids for _ in self._iter_subject(sid, all_subjects))
-
-        n_test = max(1, int(total * _TEST_FRACTION))
-        n_val = max(1, int(total * _VAL_FRACTION))
-        row_idx = 0
-
         subject_label_map = {sid: i for i, sid in enumerate(sorted(all_subjects))}
 
+        rows: list[dict] = []  # type: ignore[type-arg]
         for sid in shard_ids:
-            for iris_bytes, fp_bytes, sample_id in self._iter_subject(sid, all_subjects):
-                if row_idx < n_test:
+            samples = list(self._iter_subject(sid, all_subjects))  # bytes read once
+            n_test, n_val = self._split_counts(len(samples))
+            for i, (iris_bytes, fp_bytes, sample_id) in enumerate(samples):
+                if i < n_test:
                     split = "test"
-                elif row_idx < n_test + n_val:
+                elif i < n_test + n_val:
                     split = "val"
                 else:
                     split = "train"
-
-                rows.append({
-                    "schema_version": 1,
-                    "subject_id": sid,
-                    "sample_id": sample_id,
-                    "iris_bytes": iris_bytes,
-                    "fingerprint_bytes": fp_bytes,
-                    "label": subject_label_map[sid],
-                    "split": split,
-                    "source_shard": sid,
-                })
-                row_idx += 1
+                rows.append(
+                    {
+                        "schema_version": 1,
+                        "subject_id": sid,
+                        "sample_id": sample_id,
+                        "iris_bytes": iris_bytes,
+                        "fingerprint_bytes": fp_bytes,
+                        "label": subject_label_map[sid],
+                        "split": split,
+                        "source_shard": sid,
+                    }
+                )
 
         return self._rows_to_table(rows)
+
+    @staticmethod
+    def _split_counts(n: int) -> tuple[int, int]:
+        """Return (n_test, n_val) for a subject with *n* samples.
+
+        Guarantees at least one training sample per subject; test/val are only
+        carved out once enough samples exist to leave train non-empty.
+        """
+        n_test = int(n * _TEST_FRACTION)
+        n_val = int(n * _VAL_FRACTION)
+        while n - n_test - n_val < 1 and (n_test + n_val) > 0:
+            if n_val > 0:
+                n_val -= 1
+            else:
+                n_test -= 1
+        return n_test, n_val
 
     def _iter_subject(
         self,
         subject_id: str,
         all_subjects: set[str],
-    ):  # type: ignore[return]
+    ) -> Iterator[tuple[bytes, bytes, str]]:
         """Yield (iris_bytes, fp_bytes, sample_id) for every sample of one subject."""
         if subject_id not in all_subjects:
             raise ShardNotFoundError(subject_id, str(self._root))
@@ -108,9 +130,7 @@ class IrisFingerprintIngestor:
         if not iris_paths:
             raise MissingModalityError(subject_id, "iris", str(self._iris_root / subject_id))
         if not fp_paths:
-            raise MissingModalityError(
-                subject_id, "fingerprint", str(self._fp_root / subject_id)
-            )
+            raise MissingModalityError(subject_id, "fingerprint", str(self._fp_root / subject_id))
 
         # Pair each iris image with the first fingerprint (simplest pairing strategy)
         fp_bytes = fp_paths[0].read_bytes()
@@ -130,5 +150,8 @@ class IrisFingerprintIngestor:
     @staticmethod
     def _rows_to_table(rows: list[dict]) -> pa.Table:  # type: ignore[type-arg]
         if not rows:
-            return pa.table({f.name: [] for f in BIOMETRIC_ARROW_SCHEMA}, schema=BIOMETRIC_ARROW_SCHEMA)
+            return pa.table(
+                {f.name: [] for f in BIOMETRIC_ARROW_SCHEMA},
+                schema=BIOMETRIC_ARROW_SCHEMA,
+            )
         return pa.Table.from_pylist(rows, schema=BIOMETRIC_ARROW_SCHEMA)

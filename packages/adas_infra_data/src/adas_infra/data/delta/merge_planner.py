@@ -18,14 +18,14 @@ full_scan
 from __future__ import annotations
 
 import logging
-from enum import Enum
+from enum import StrEnum
 
 from adas_infra.core.contracts.manifest_store import BaseManifestStore
 
 logger = logging.getLogger(__name__)
 
 
-class MergeStrategy(str, Enum):
+class MergeStrategy(StrEnum):
     INCREMENTAL = "incremental"
     FULL_SCAN = "full_scan"
 
@@ -49,12 +49,12 @@ class MergePlanner:
     def plan(self) -> list[str]:
         """Return an ordered list of shard IDs to ingest in the next run."""
         if self._strategy == MergeStrategy.FULL_SCAN:
-            # Re-mark all shards as pending so they are included
-            all_entries = self._store.get_pending_shards()
-            shard_ids = [e.shard_id for e in all_entries]
+            # Reprocessing / cold-start: every known shard, ingested or not.
+            entries = self._store.get_all_shards()
         else:
-            pending = self._store.get_pending_shards()
-            shard_ids = [e.shard_id for e in pending]
+            # Streaming / production: only shards not yet ingested.
+            entries = self._store.get_pending_shards()
+        shard_ids = [e.shard_id for e in entries]
 
         logger.info(
             "MergePlanner(%s): %d shards selected for ingestion",

@@ -21,6 +21,7 @@ import base64
 import io
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -78,7 +79,10 @@ def _make_png_b64(h: int, w: int) -> str:
 def test_01_synthetic_ingestor_generates_valid_table(
     pipeline_dirs: dict[str, Path], pipeline_state: dict[str, Any]
 ) -> None:
-    from adas_infra.data.ingestion.synthetic_ingestor import SyntheticIngestor, SyntheticIngestorConfig
+    from adas_infra.data.ingestion.synthetic_ingestor import (
+        SyntheticIngestor,
+        SyntheticIngestorConfig,
+    )
     from adas_infra.data.validation.schema_guard import SchemaGuard
 
     cfg = SyntheticIngestorConfig(
@@ -113,7 +117,13 @@ def test_02_delta_log_and_manifest_store(
     store = ManifestStoreSQLite(db_path=str(pipeline_dirs["state"] / "manifest.db"))
 
     for sid in shard_ids:
-        rec = DeltaRecord(shard_id=sid, operation=DeltaOperation.ADD, path=sid, byte_size=0, num_rows=0)
+        rec = DeltaRecord(
+            shard_id=sid,
+            operation=DeltaOperation.ADD,
+            path=sid,
+            byte_size=0,
+            num_rows=0,
+        )
         wal.append(rec)
         store.record_delta(rec)
 
@@ -169,29 +179,35 @@ def test_05_single_device_engine_trains(
     pipeline_dirs: dict[str, Path], pipeline_state: dict[str, Any], ray_init: None
 ) -> None:
     import pyarrow.compute as pc
+
     from adas_infra.data.loaders.plasma_prefetcher import PlasmaPrefetcher
     from adas_infra.train.engines.single_device_engine import SingleDeviceEngine
 
     table = pipeline_state["table"]
     num_classes = int(pc.max(table.column("label")).as_py()) + 1
 
-    class Cfg:
-        class trainer:
-            seed = 42
-            max_steps = 10
-            batch_size = 8
-            lr = 1e-3
-            weight_decay = 1e-4
-            checkpoint_dir = str(pipeline_dirs["checkpoints"])
-            profile = "local_mock"
+    # SimpleNamespace, not nested classes: a class body cannot read an enclosing
+    # function local (`num_classes = num_classes` raises NameError), and the engine
+    # only needs attribute access, which SimpleNamespace provides.
+    cfg = SimpleNamespace(
+        trainer=SimpleNamespace(
+            seed=42,
+            max_steps=10,
+            batch_size=8,
+            lr=1e-3,
+            weight_decay=1e-4,
+            checkpoint_dir=str(pipeline_dirs["checkpoints"]),
+            profile="local_mock",
+        ),
+        model=SimpleNamespace(
+            num_classes=num_classes,
+            iris_embed_dim=32,
+            fp_embed_dim=32,
+            name="fusion_baseline",
+        ),
+    )
 
-        class model:
-            num_classes = num_classes
-            iris_embed_dim = 32
-            fp_embed_dim = 32
-            name = "fusion_baseline"
-
-    engine = SingleDeviceEngine(cfg=Cfg())
+    engine = SingleDeviceEngine(cfg=cfg)
     train_pf = PlasmaPrefetcher(pipeline_state["train_refs"])
     val_pf = PlasmaPrefetcher(pipeline_state["val_refs"]) if pipeline_state["val_refs"] else None
 
@@ -226,7 +242,7 @@ def test_07_mlflow_registry_registers_model(
 ) -> None:
     from adas_infra.serve.registry.mlflow_local_registry import MLflowLocalRegistry
 
-    tracking_uri = f"file:{pipeline_dirs['mlruns']}"
+    tracking_uri = f"sqlite:///{pipeline_dirs['mlruns'] / 'mlflow.db'}"
     reg = MLflowLocalRegistry(tracking_uri=tracking_uri)
     version_uri = reg.register(pipeline_state["model_path"], pipeline_state["manifest"])
 
@@ -239,9 +255,11 @@ def test_08_fastapi_endpoint_health_and_predict(
 ) -> None:
     """Test /health and /predict by injecting state into app.state — no reload needed."""
     import os
+
+    from fastapi.testclient import TestClient
+
     import adas_infra.serve.inference.local_fastapi_endpoint as ep
     from adas_infra.serve.inference.local_fastapi_endpoint import _AppState, _load_model
-    from fastapi.testclient import TestClient
 
     model_path = str(pipeline_state["model_path"])
     os.environ["ADAS_MODEL_PATH"] = model_path
@@ -302,8 +320,11 @@ def test_10_timing_metrics_present_in_final_metrics() -> None:
         for _ in range(3)
     ]
     loop = TrainLoop(
-        model=model, optimizer=optimizer, scheduler=None,
-        device=torch.device("cpu"), max_steps=3,
+        model=model,
+        optimizer=optimizer,
+        scheduler=None,
+        device=torch.device("cpu"),
+        max_steps=3,
     )
     metrics = loop.run(iter(fake_batches))
 

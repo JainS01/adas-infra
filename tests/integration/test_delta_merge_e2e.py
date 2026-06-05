@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from adas_infra.core.schemas.delta_record import DeltaOperation, DeltaRecord
 from adas_infra.data.delta.delta_log import DeltaLog
 from adas_infra.data.delta.manifest_store_sqlite import ManifestStoreSQLite
@@ -19,7 +17,13 @@ class TestDeltaMergeE2E:
 
         # Add 5 shards
         for i in range(5):
-            rec = DeltaRecord(shard_id=f"shard_{i:03d}", operation=DeltaOperation.ADD, path=f"s{i}", byte_size=100, num_rows=10)
+            rec = DeltaRecord(
+                shard_id=f"shard_{i:03d}",
+                operation=DeltaOperation.ADD,
+                path=f"s{i}",
+                byte_size=100,
+                num_rows=10,
+            )
             wal.append(rec)
             store.record_delta(rec)
 
@@ -39,22 +43,38 @@ class TestDeltaMergeE2E:
     def test_full_scan_returns_all_shards(self, tmp_path: Path):
         store = ManifestStoreSQLite(db_path=str(tmp_path / "manifest.db"))
         for i in range(3):
-            rec = DeltaRecord(shard_id=f"s{i}", operation=DeltaOperation.ADD, path=f"p{i}", byte_size=0, num_rows=0)
+            rec = DeltaRecord(
+                shard_id=f"s{i}",
+                operation=DeltaOperation.ADD,
+                path=f"p{i}",
+                byte_size=0,
+                num_rows=0,
+            )
             store.record_delta(rec)
 
         store.mark_ingested(["s0", "s1", "s2"])
 
         planner = MergePlanner(manifest_store=store, strategy=MergeStrategy.FULL_SCAN)
         planned = planner.plan()
-        # Full scan still only returns pending; mark all ingested → 0
-        assert len(planned) == 0
+        # Full scan returns every shard regardless of ingestion status (reprocessing).
+        assert sorted(planned) == ["s0", "s1", "s2"]
+
+        # Incremental, by contrast, skips already-ingested shards.
+        incremental = MergePlanner(manifest_store=store, strategy=MergeStrategy.INCREMENTAL)
+        assert incremental.plan() == []
         store.close()
 
     def test_wal_offset_matches_record_count(self, tmp_path: Path):
         wal = DeltaLog(wal_dir=tmp_path)
         store = ManifestStoreSQLite(db_path=str(tmp_path / "manifest.db"))
         for i in range(7):
-            rec = DeltaRecord(shard_id=f"s{i}", operation=DeltaOperation.ADD, path=f"p{i}", byte_size=0, num_rows=0)
+            rec = DeltaRecord(
+                shard_id=f"s{i}",
+                operation=DeltaOperation.ADD,
+                path=f"p{i}",
+                byte_size=0,
+                num_rows=0,
+            )
             wal.append(rec)
             store.record_delta(rec)
         assert wal.offset == 7

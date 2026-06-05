@@ -21,6 +21,9 @@ dependencies = [
 [project.optional-dependencies]
 blake3 = ["blake3>=0.4.1"]
 
+[tool.uv.sources]
+adas-infra-core = { workspace = true }
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/adas_infra"]
 

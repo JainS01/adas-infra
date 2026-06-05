@@ -1,21 +1,31 @@
-name: Integration Tests — Ray + delta pipeline
+name: Integration Tests — component cross-talk & hardware mock
 
 on:
+  push:
+    branches: [main, develop]
   pull_request:
     branches: [main]
-  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   integration:
-    name: Integration tests (CPU)
+    name: Cross-module Integration Verification
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           version: "latest"
-      - run: uv sync
-      - name: Run integration tests (skip GPU-gated)
-        run: uv run pytest tests/integration/ -v --tb=short -m "not gpu" --timeout=120
+
+      - name: Install dependencies (All Workspace Packages)
+        run: uv sync --all-packages
+
+      - name: Run integration test suite
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/packages/adas_infra_core:$(pwd)/packages/adas_infra_data:$(pwd)/packages/adas_infra_train
+          uv run pytest tests/integration/ -v --tb=short

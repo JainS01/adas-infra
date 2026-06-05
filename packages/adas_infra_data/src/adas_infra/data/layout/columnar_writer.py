@@ -29,9 +29,7 @@ class ColumnarWriter:
     ) -> None:
         self._dest = dest
         dest.parent.mkdir(parents=True, exist_ok=True)
-        self._writer = pq.ParquetWriter(
-            str(dest), schema, compression=compression
-        )
+        self._writer = pq.ParquetWriter(str(dest), schema, compression=compression)  # type: ignore[no-untyped-call]
         self._row_group_size = row_group_size
         self._rows_written = 0
         self._closed = False
@@ -39,18 +37,18 @@ class ColumnarWriter:
     def write_batch(self, batch: pa.RecordBatch) -> None:
         if self._closed:
             raise RuntimeError("ColumnarWriter is already closed")
-        table = pa.Table.from_batches([batch], schema=self._writer.schema_arrow)
-        self._writer.write_table(table)
+        table = pa.Table.from_batches([batch], schema=self._writer.schema_arrow)  # type: ignore[attr-defined]
+        self._writer.write_table(table)  # type: ignore[no-untyped-call]
         self._rows_written += len(batch)
         logger.debug("ColumnarWriter: wrote %d rows, total %d", len(batch), self._rows_written)
 
     def close(self) -> None:
         if not self._closed:
-            self._writer.close()
+            self._writer.close()  # type: ignore[no-untyped-call]
             self._closed = True
             logger.info("ColumnarWriter: closed %s (%d rows total)", self._dest, self._rows_written)
 
-    def __enter__(self) -> "ColumnarWriter":
+    def __enter__(self) -> ColumnarWriter:
         return self
 
     def __exit__(self, *_: object) -> None:

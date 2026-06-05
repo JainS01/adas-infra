@@ -46,14 +46,12 @@ class ArrowBiometricDataset(Dataset):  # type: ignore[type-arg]
         iris_size: tuple[int, int] = _IRIS_SIZE,
         fp_size: tuple[int, int] = _FP_SIZE,
     ) -> None:
-        mask = pc.equal(table.column("split"), split)
+        mask = pc.equal(table.column("split"), split)  # type: ignore[attr-defined]
         self._table = table.filter(mask)
         self._split = split
         self._iris_size = iris_size
         self._fp_size = fp_size
-        logger.info(
-            "ArrowBiometricDataset: split=%s, rows=%d", split, len(self._table)
-        )
+        logger.info("ArrowBiometricDataset: split=%s, rows=%d", split, len(self._table))
 
     def __len__(self) -> int:
         return len(self._table)
@@ -91,4 +89,4 @@ class ArrowBiometricDataset(Dataset):  # type: ignore[type-arg]
 
     def num_classes(self) -> int:
         """Return the number of unique subject labels in this split."""
-        return int(pc.max(self._table.column("label")).as_py()) + 1
+        return int(pc.max(self._table.column("label")).as_py()) + 1  # type: ignore[attr-defined]

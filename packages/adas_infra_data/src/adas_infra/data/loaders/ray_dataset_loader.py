@@ -43,7 +43,9 @@ _IRIS_SIZE = (64, 64)
 _FP_SIZE = (96, 96)
 
 
-def _decode_image_safe(raw: bytes, size: tuple[int, int], modality: str, sample_id: str) -> np.ndarray:
+def _decode_image_safe(
+    raw: bytes, size: tuple[int, int], modality: str, sample_id: str
+) -> np.ndarray:
     """Decode image bytes to a (1, H, W) float32 array; raises ValueError on corrupt/empty input."""
     if not raw:
         raise ValueError(f"Empty {modality} bytes for sample '{sample_id}'")
@@ -68,14 +70,17 @@ def _decode_and_align_batch(batch: dict[str, Any]) -> dict[str, Any]:
     fp_list: list[np.ndarray] = []
 
     for iris_raw, fp_raw, sample_id in zip(
-        batch["iris_bytes"], batch["fingerprint_bytes"], batch["sample_id"]
+        batch["iris_bytes"],
+        batch["fingerprint_bytes"],
+        batch["sample_id"],
+        strict=False,
     ):
         iris_list.append(_decode_image_safe(bytes(iris_raw), _IRIS_SIZE, "iris", str(sample_id)))
         fp_list.append(_decode_image_safe(bytes(fp_raw), _FP_SIZE, "fingerprint", str(sample_id)))
 
     return {
-        "iris": np.stack(iris_list, axis=0),            # (B, 1, 64, 64)
-        "fingerprint": np.stack(fp_list, axis=0),        # (B, 1, 96, 96)
+        "iris": np.stack(iris_list, axis=0),  # (B, 1, 64, 64)
+        "fingerprint": np.stack(fp_list, axis=0),  # (B, 1, 96, 96)
         "label": np.array(batch["label"], dtype=np.int64),
         "subject_id": batch["subject_id"],
         "sample_id": batch["sample_id"],
@@ -111,7 +116,7 @@ class RayDatasetLoader:
         """
         import pyarrow.compute as pc
 
-        mask = pc.equal(self._table.column("split"), split)
+        mask = pc.equal(self._table.column("split"), split)  # type: ignore[attr-defined]
         split_table = self._table.filter(mask)
 
         if len(split_table) == 0:
@@ -125,7 +130,13 @@ class RayDatasetLoader:
             batch_size=self._batch_size,
             batch_format="numpy",
             num_cpus=self._num_cpus_per_actor,
-            concurrency=self._concurrency,
+            # `concurrency=` was deprecated in Ray 2.51 in favour of `compute`.
+            # On tiny inputs Ray logs "max concurrency N but only 1 input": the task pool is
+            # sized for parallelism it can't use when a split fits in a single block. This is
+            # expected at toy/judge scale; with many shards each becomes a block and the pool
+            # saturates. Repartitioning here just to silence the notice would add shuffle cost
+            # for no real gain, so it is left as-is by design.
+            compute=ray.data.TaskPoolStrategy(size=self._concurrency),
         )
 
         refs: list[Any] = []

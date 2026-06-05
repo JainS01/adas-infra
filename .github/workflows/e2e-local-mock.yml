@@ -1,45 +1,38 @@
-name: E2E — local_mock pipeline (judge path, <180s CPU)
+name: E2E Local Mock — deterministic trial run
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
     branches: [main]
 
-jobs:
-  e2e-local-mock:
-    name: Full pipeline on ubuntu-latest CPU
-    runs-on: ubuntu-latest
-    timeout-minutes: 5     # fail fast if e2e takes >5 min
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
+jobs:
+  e2e-mock:
+    name: Local End-to-End Mock Run
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           version: "latest"
 
-      - name: Install all packages (workspace)
-        run: uv sync
+      - name: Install dependencies (All Workspace Packages)
+        run: uv sync --all-packages
 
-      - name: Seed synthetic delta log
+      # Two complementary e2e checks:
+      #  1. pipeline.py exercises the standalone, Hydra-free path (distinct coverage).
+      #  2. the pytest suite is assertion-bearing — it gates the FastAPI /predict contract,
+      #     the run_manifest.json reproducibility fields, TorchScript export, and registry.
+      - name: Execute standalone training trial loop (smoke)
+        run: uv run python packages/adas_infra_train/src/pipeline.py
+
+      - name: Run E2E test suite (assertion-bearing)
         run: |
-          uv run python scripts/seed_delta_log.py \
-            --synthetic \
-            --num-shards 4 \
-            --num-subjects 10 \
-            --output-dir ./data/synthetic
-
-      - name: Run E2E test suite (under 180s on CPU)
-        run: uv run pytest tests/e2e/ -v -m e2e --timeout=180 --tb=short
-
-      - name: Upload run artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-artifacts-${{ github.sha }}
-          path: |
-            checkpoints/
-            state/
-            .last_run_id
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/packages/adas_infra_core:$(pwd)/packages/adas_infra_data:$(pwd)/packages/adas_infra_train
+          uv run pytest tests/e2e/ -v --tb=short -m e2e --timeout=180

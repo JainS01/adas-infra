@@ -34,12 +34,13 @@ _WATCH_GLOB = "*.parquet"
 def _checksum(path: Path) -> str:
     """Compute a blake3 checksum (falls back to sha256 if blake3 unavailable)."""
     try:
-        import blake3  # type: ignore[import-untyped]
-        hasher = blake3.blake3()  # type: ignore[attr-defined]
+        import blake3
+
+        hasher = blake3.blake3()
         with path.open("rb") as fh:
             for chunk in iter(lambda: fh.read(65536), b""):
                 hasher.update(chunk)
-        return hasher.hexdigest()
+        return str(hasher.hexdigest())
     except ImportError:
         sha = hashlib.sha256()
         with path.open("rb") as fh:
@@ -51,7 +52,7 @@ def _checksum(path: Path) -> str:
 class _DebounceHandler(FileSystemEventHandler):
     """Coalesces rapid filesystem events with a 250 ms debounce window."""
 
-    def __init__(self, out_queue: "queue.Queue[Path]", watch_suffix: str = ".parquet") -> None:
+    def __init__(self, out_queue: queue.Queue[Path], watch_suffix: str = ".parquet") -> None:
         super().__init__()
         self._queue = out_queue
         self._suffix = watch_suffix

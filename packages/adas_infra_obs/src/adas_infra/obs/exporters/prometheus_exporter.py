@@ -8,7 +8,6 @@ prometheus.yml scrapes this endpoint from the training container.
 from __future__ import annotations
 
 import logging
-import threading
 
 from prometheus_client import start_http_server
 
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 class PrometheusExporter:
     """Wraps start_http_server for the shared registry on a background thread."""
 
-    def __init__(self, port: int = 9000, addr: str = "0.0.0.0") -> None:
+    def __init__(self, port: int = 9000, addr: str = "0.0.0.0") -> None:  # noqa: S104  # nosec B104
         self._port = port
         self._addr = addr
         self._started = False

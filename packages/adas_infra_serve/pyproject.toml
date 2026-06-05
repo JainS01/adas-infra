@@ -20,6 +20,10 @@ dependencies = [
     "prometheus-client>=0.20.0",
 ]
 
+[tool.uv.sources]
+adas-infra-core = { workspace = true }
+adas-infra-train = { workspace = true }
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/adas_infra"]
 

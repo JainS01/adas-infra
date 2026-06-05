@@ -7,31 +7,96 @@ import base64
 import pytest
 
 from adas_infra.core.errors import SchemaVersionError
+from adas_infra.core.schemas._versioning import (
+    read_versioned,
+    require_version_lte,
+    upcast_to_current,
+)
 from adas_infra.core.schemas.delta_record import DeltaOperation, DeltaRecord
-from adas_infra.core.schemas.inference import PredictRequest, PredictResponse, PredictionCandidate
+from adas_infra.core.schemas.inference import PredictRequest
 from adas_infra.core.schemas.manifest import RunManifest
-from adas_infra.core.schemas._versioning import require_version_lte
 
 
 class TestDeltaRecord:
     def test_checksum_computed_on_construction(self):
-        rec = DeltaRecord(shard_id="s1", operation=DeltaOperation.ADD, path="/data/s1.parquet", byte_size=1024, num_rows=100)
+        rec = DeltaRecord(
+            shard_id="s1",
+            operation=DeltaOperation.ADD,
+            path="/data/s1.parquet",
+            byte_size=1024,
+            num_rows=100,
+        )
         assert len(rec.checksum) == 64  # SHA-256 hex
 
     def test_verify_passes_for_valid_record(self):
-        rec = DeltaRecord(shard_id="s1", operation=DeltaOperation.ADD, path="/data/s1.parquet", byte_size=0, num_rows=0)
+        rec = DeltaRecord(
+            shard_id="s1",
+            operation=DeltaOperation.ADD,
+            path="/data/s1.parquet",
+            byte_size=0,
+            num_rows=0,
+        )
         assert rec.verify() is True
 
     def test_verify_fails_if_checksum_tampered(self):
-        rec = DeltaRecord(shard_id="s1", operation=DeltaOperation.ADD, path="/data/s1.parquet", byte_size=0, num_rows=0)
+        rec = DeltaRecord(
+            shard_id="s1",
+            operation=DeltaOperation.ADD,
+            path="/data/s1.parquet",
+            byte_size=0,
+            num_rows=0,
+        )
         rec.checksum = "deadbeef" * 8
         assert rec.verify() is False
 
     def test_roundtrip_json(self):
-        rec = DeltaRecord(shard_id="s2", operation=DeltaOperation.REMOVE, path="/d/s2.parquet", byte_size=512, num_rows=50)
+        rec = DeltaRecord(
+            shard_id="s2",
+            operation=DeltaOperation.REMOVE,
+            path="/d/s2.parquet",
+            byte_size=512,
+            num_rows=50,
+        )
         restored = DeltaRecord.model_validate_json(rec.model_dump_json())
         assert restored.shard_id == "s2"
         assert restored.operation == DeltaOperation.REMOVE
+
+
+class TestReadVersioned:
+    """The reader upcast path used by DeltaLog.replay."""
+
+    def test_reads_current_version(self):
+        data = {
+            "schema_version": 1,
+            "shard_id": "s1",
+            "operation": "ADD",
+            "path": "/d/s1.parquet",
+            "byte_size": 0,
+            "num_rows": 0,
+        }
+        rec = read_versioned(DeltaRecord, data)
+        assert rec.shard_id == "s1"
+
+    def test_rejects_future_version(self):
+        data = {
+            "schema_version": 99,
+            "shard_id": "s1",
+            "operation": "ADD",
+            "path": "/d/s1.parquet",
+            "byte_size": 0,
+            "num_rows": 0,
+        }
+        with pytest.raises(SchemaVersionError):
+            read_versioned(DeltaRecord, data)
+
+    def test_upcast_applies_migration_chain(self):
+        def _v1_to_v2(d: dict) -> dict:
+            d = {**d, "schema_version": 2, "added": True}
+            return d
+
+        out = upcast_to_current({"schema_version": 1}, {1: _v1_to_v2})
+        assert out["schema_version"] == 2
+        assert out["added"] is True
 
 
 class TestRunManifest:
@@ -77,5 +142,5 @@ class TestPredictRequest:
         assert req.iris_bytes() == raw
 
     def test_invalid_base64_raises(self):
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             PredictRequest(request_id="r", iris_b64="not-valid-b64!!!", fingerprint_b64="abc")

@@ -1,34 +1,32 @@
-"""Schema evolution helpers — upcast functions and the @versioned_schema decorator."""
+"""Schema evolution helpers — the @versioned_schema tag and the reader upcast path.
+
+Wire-up (so nothing here is decorative):
+  - ``@versioned_schema(current=N)`` stamps a Pydantic model with ``_CURRENT_VERSION``.
+  - ``MIGRATION_REGISTRY`` maps each schema name to its {from_version: migrate_fn} chain.
+  - ``read_versioned(Model, data)`` is what readers call: it upcasts a raw dict
+    through the migration chain, rejects anything newer than the model supports,
+    then validates. ``DeltaLog.replay`` uses it on every WAL record.
+"""
 
 from __future__ import annotations
 
-import functools
 from typing import Any, TypeVar
+
+from pydantic import BaseModel
 
 from adas_infra.core.errors import SchemaVersionError
 
-T = TypeVar("T")
+T = TypeVar("T", bound=BaseModel)
 
 
 def versioned_schema(current: int) -> Any:
-    """Class decorator that attaches version-guard helpers to a Pydantic model."""
+    """Class decorator that stamps a Pydantic model with its current schema version.
+
+    The stamp is read back by :func:`read_versioned` to bound-check incoming data.
+    """
 
     def decorator(cls: type[T]) -> type[T]:
         cls._CURRENT_VERSION = current  # type: ignore[attr-defined]
-
-        @classmethod  # type: ignore[misc]
-        def from_dict_versioned(klass: type[T], data: dict[str, Any]) -> T:
-            """Parse *data*, rejecting any schema_version > current."""
-            found = int(data.get("schema_version", 1))
-            if found > current:
-                raise SchemaVersionError(
-                    found=found,
-                    max_supported=current,
-                    schema_name=klass.__name__,
-                )
-            return klass.model_validate(data)  # type: ignore[attr-defined]
-
-        cls.from_dict_versioned = from_dict_versioned  # type: ignore[attr-defined]
         return cls
 
     return decorator
@@ -52,6 +50,20 @@ def require_version_lte(found: int, maximum: int, schema_name: str) -> None:
     """Raise SchemaVersionError if *found* exceeds *maximum*."""
     if found > maximum:
         raise SchemaVersionError(found=found, max_supported=maximum, schema_name=schema_name)
+
+
+def read_versioned(model_cls: type[T], data: dict[str, Any], schema_name: str | None = None) -> T:
+    """Parse *data* into *model_cls*, upcasting through the migration chain first.
+
+    The canonical reader entry point: handles forward-compatible data by running
+    the registered migrations, rejects data newer than this build supports, then
+    validates. Used by the WAL replay path so persisted records survive a schema bump.
+    """
+    name = schema_name or model_cls.__name__
+    migrated = upcast_to_current(data, MIGRATION_REGISTRY.get(name, {}))
+    current = int(getattr(model_cls, "_CURRENT_VERSION", 1))
+    require_version_lte(int(migrated.get("schema_version", 1)), current, name)
+    return model_cls.model_validate(migrated)
 
 
 # ── Concrete migration stubs (extend as schemas evolve) ──────────────────────

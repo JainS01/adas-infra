@@ -1,3 +1,4 @@
+# @package _global_
 # cloud_prod profile — Azure Blob + Azure ML + multi-node Ray.
 # Secrets MUST be supplied via ${oc.env:VAR} — never hardcoded.
 

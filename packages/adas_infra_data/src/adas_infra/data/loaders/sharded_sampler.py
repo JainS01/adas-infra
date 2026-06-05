@@ -8,7 +8,7 @@ falling back to a standard DataLoader (e.g., in the single-device profile).
 from __future__ import annotations
 
 import math
-from typing import Iterator
+from collections.abc import Iterator
 
 import torch
 import torch.distributed as dist

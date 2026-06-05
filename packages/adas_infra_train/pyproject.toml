@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "adas-infra-core",
     "adas-infra-data",
+    "ray[data]>=2.23.0",
     "torch>=2.3.0",
     "torchvision>=0.18.0",
     "mlflow>=2.13.0",
@@ -18,6 +19,10 @@ dependencies = [
     "hydra-core>=1.3.2",
     "omegaconf>=2.3.0",
 ]
+
+[tool.uv.sources]
+adas-infra-core = { workspace = true }
+adas-infra-data = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/adas_infra"]

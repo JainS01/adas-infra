@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -59,7 +60,13 @@ class TrainLoop:
         self._max_steps = max_steps
         self._hooks = hooks or []
         self._amp = amp and device.type == "cuda"
-        self._scaler = torch.amp.GradScaler("cuda") if self._amp else None
+        # torch.amp.GradScaler("cuda") — torch.cuda.amp.GradScaler is deprecated.
+        # (torch stubs don't re-export GradScaler from torch.amp; runtime is correct.)
+        self._scaler = (
+            torch.amp.GradScaler("cuda")  # type: ignore[attr-defined]
+            if self._amp
+            else None
+        )
         self._criterion = nn.CrossEntropyLoss()
 
     def run(self, data: Iterable[dict[str, Any]]) -> dict[str, float]:
@@ -132,7 +139,7 @@ class TrainLoop:
         return last_metrics
 
     def _step(self, batch: dict[str, Any], step: int) -> dict[str, float]:
-        iris = self._to_device(batch["iris"])        # (B, 1, H_iris, W_iris)
+        iris = self._to_device(batch["iris"])  # (B, 1, H_iris, W_iris)
         fingerprint = self._to_device(batch["fingerprint"])  # (B, 1, H_fp, W_fp)
         labels = self._to_device(batch["label"]).long()
 

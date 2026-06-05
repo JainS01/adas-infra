@@ -25,7 +25,6 @@ import torch
 import torch.optim as optim
 
 from adas_infra.core.contracts.trainer import BaseTrainer
-from adas_infra.core.determinism.env_snapshot import git_sha, hydra_config_hash
 from adas_infra.core.determinism.seeding import seed_everything
 from adas_infra.core.schemas.manifest import RunManifest
 from adas_infra.train.loops.eval_loop import EvalLoop
@@ -38,7 +37,7 @@ from adas_infra.train.reproducibility.run_manifest import build_run_manifest
 logger = logging.getLogger(__name__)
 
 
-class SingleDeviceEngine(BaseTrainer):
+class SingleDeviceEngine(BaseTrainer):  # type: ignore[misc]
     """Train on a single CPU or GPU; full BaseTrainer template contract.
 
     Config keys consumed (Hydra DictConfig or plain dict):
@@ -61,6 +60,15 @@ class SingleDeviceEngine(BaseTrainer):
         self._optimizer: optim.Optimizer | None = None
         self._scheduler: Any = None
         self._run_id: str = str(uuid.uuid4())[:8]
+        self._delta_log_offset: int = 0
+
+    def set_data_provenance(self, delta_log_offset: int) -> None:
+        """Record the WAL offset that produced this run's data.
+
+        Called by the entrypoint after ingestion so the reproducibility tuple's
+        data-version axis reflects the exact delta-log position, not a constant.
+        """
+        self._delta_log_offset = delta_log_offset
 
     # ── BaseTrainer template methods ──────────────────────────────────────────
 
@@ -137,7 +145,7 @@ class SingleDeviceEngine(BaseTrainer):
             hooks=[h for h in self._hooks if isinstance(h, TrainingHook)],
             amp=False,
         )
-        final_metrics = train_loop.run(train_data)
+        train_loop.run(train_data)
 
         val_metrics: dict[str, float] = {}
         if val_data is not None:
@@ -151,9 +159,10 @@ class SingleDeviceEngine(BaseTrainer):
 
         manifest = build_run_manifest(
             run_id=self._run_id,
-            cfg=cfg,
+            cfg=self._cfg,
             model=self._model,
             val_metrics=val_metrics,
+            delta_log_offset=self._delta_log_offset,
         )
         return manifest
 

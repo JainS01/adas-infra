@@ -73,7 +73,7 @@ class LocalCkptStore:
             optimizer.load_state_dict(state["optimizer_state_dict"])
 
         logger.info("LocalCkptStore: loaded step %d from %s", state.get("step", -1), path)
-        return state
+        return state  # type: ignore[no-any-return]
 
     def export_for_registry(self, model: nn.Module, dest: Path) -> Path:
         """Save the model state_dict-only to *dest* for registry upload."""

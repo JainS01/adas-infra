@@ -31,7 +31,7 @@ class BaseTrainer(abc.ABC):
         model: Any,
         train_data: Any,
         val_data: Any | None = None,
-    ) -> "RunManifest":
+    ) -> RunManifest:
         """Full training lifecycle. Returns a RunManifest for reproducibility."""
         self._setup(model, train_data)
         manifest = self._run_loop(model, train_data, val_data)
@@ -50,9 +50,9 @@ class BaseTrainer(abc.ABC):
         model: Any,
         train_data: Any,
         val_data: Any | None,
-    ) -> "RunManifest":
+    ) -> RunManifest:
         """Execute the main training loop; return a completed RunManifest."""
 
     @abc.abstractmethod
-    def _teardown(self, model: Any, manifest: "RunManifest") -> None:
+    def _teardown(self, model: Any, manifest: RunManifest) -> None:
         """Save checkpoint, persist run manifest, destroy process group."""

@@ -22,6 +22,7 @@ import io
 import logging
 import os
 import time
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,9 +35,9 @@ from fastapi.responses import PlainTextResponse
 from PIL import Image, UnidentifiedImageError
 
 from adas_infra.core.schemas.inference import (
+    PredictionCandidate,
     PredictRequest,
     PredictResponse,
-    PredictionCandidate,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,10 +63,10 @@ def _load_model(model_path: str) -> torch.jit.ScriptModule:
         raise FileNotFoundError(
             f"Model not found at {path}. Set ADAS_MODEL_PATH or run 'adas-train' first."
         )
-    model = torch.jit.load(str(path), map_location=torch.device("cpu"))
+    model = torch.jit.load(str(path), map_location=torch.device("cpu"))  # type: ignore[no-untyped-call]
     model.eval()
     logger.info("Loaded TorchScript model from %s", path)
-    return model
+    return model  # type: ignore[no-any-return]
 
 
 def _decode_image(raw: bytes, size: tuple[int, int], label: str) -> torch.Tensor:
@@ -81,9 +82,13 @@ def _decode_image(raw: bytes, size: tuple[int, int], label: str) -> torch.Tensor
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # type: ignore[type-arg]
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Load model into app.state on startup; release on shutdown."""
     state = _AppState()
+    # serve() may inject a subject-id map before uvicorn starts the lifespan.
+    override_map = getattr(app.state, "override_subject_id_map", None)
+    if override_map:
+        state.subject_id_map = override_map
     model_path = os.getenv("ADAS_MODEL_PATH", _DEFAULT_MODEL_PATH)
     try:
         state.model = _load_model(model_path)
@@ -127,7 +132,7 @@ async def predict(request: Request, body: PredictRequest) -> PredictResponse:
     fp_tensor = _decode_image(body.fingerprint_bytes(), _FP_SIZE, "fingerprint")
 
     with torch.no_grad():
-        logits = state.model(iris_tensor, fp_tensor)   # (1, num_classes)
+        logits = state.model(iris_tensor, fp_tensor)  # (1, num_classes)
         probs = torch.softmax(logits, dim=-1).squeeze(0)  # (num_classes,)
 
     top_k = min(body.top_k, probs.shape[0])
@@ -140,7 +145,7 @@ async def predict(request: Request, body: PredictRequest) -> PredictResponse:
             label=idx.item(),
             confidence=round(val.item(), 6),
         )
-        for rank, (val, idx) in enumerate(zip(top_values, top_indices))
+        for rank, (val, idx) in enumerate(zip(top_values, top_indices, strict=False))
     ]
 
     latency_ms = (time.perf_counter() - t0) * 1000.0
@@ -157,6 +162,7 @@ async def metrics() -> str:
     """Prometheus metrics exposition (scraped by docker-compose Prometheus)."""
     try:
         from prometheus_client import generate_latest
+
         return generate_latest().decode("utf-8")
     except ImportError:
         return "# prometheus_client not installed\n"
@@ -164,7 +170,7 @@ async def metrics() -> str:
 
 def serve(
     model_path: str = _DEFAULT_MODEL_PATH,
-    host: str = "0.0.0.0",
+    host: str = "0.0.0.0",  # noqa: S104  # nosec B104
     port: int = _DEFAULT_PORT,
     subject_id_map: dict[int, str] | None = None,
 ) -> None:

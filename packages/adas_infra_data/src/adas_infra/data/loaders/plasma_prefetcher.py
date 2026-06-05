@@ -1,7 +1,7 @@
 """PlasmaPrefetcher — bounded async queue between Plasma and the training loop.
 
 Specification (§0.6 of the architecture contract):
-  - maxsize = max(2, 2 × micro_batches_per_step)
+  - maxsize = max(2, 2 x micro_batches_per_step)
   - When full: producing Ray actor's put() is back-pressured (never drops)
   - Training step blocks on next() and records dataloader_lag_seconds
   - Plasma spill-to-disk is surfaced via plasma_pressure metric
@@ -67,7 +67,7 @@ class PlasmaPrefetcher:
         )
         self._thread.start()
 
-    def __iter__(self) -> "PlasmaPrefetcher":
+    def __iter__(self) -> PlasmaPrefetcher:
         if self._thread is None:
             self.start()
         return self
@@ -97,7 +97,7 @@ class PlasmaPrefetcher:
         lag = time.perf_counter() - t0
         if lag > 0.001 and self._lag_callback is not None:
             self._lag_callback(lag)
-        return item  # type: ignore[return-value]
+        return item  # type: ignore[no-any-return]
 
     def _prefetch_worker(self) -> None:
         """Background thread: resolves ObjectRefs from Plasma and enqueues batches."""

@@ -58,10 +58,14 @@ class TestRayPlasmaRoundtrip:
 
     def test_plasma_prefetcher_delivers_all_batches(self, ray_env, tmp_path):
         import ray
+
         from adas_infra.data.loaders.plasma_prefetcher import PlasmaPrefetcher
 
         batches = [
-            {"iris": np.random.rand(4, 1, 64, 64).astype(np.float32), "label": np.array([0, 1, 2, 3])}
+            {
+                "iris": np.random.rand(4, 1, 64, 64).astype(np.float32),
+                "label": np.array([0, 1, 2, 3]),
+            }
             for _ in range(5)
         ]
         refs = [ray.put(b) for b in batches]

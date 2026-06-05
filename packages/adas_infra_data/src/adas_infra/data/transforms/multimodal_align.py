@@ -40,13 +40,13 @@ class MultimodalAlignTransform:
         iris_list = []
         fp_list = []
 
-        for iris_raw, fp_raw in zip(batch["iris_bytes"], batch["fingerprint_bytes"]):
+        for iris_raw, fp_raw in zip(batch["iris_bytes"], batch["fingerprint_bytes"], strict=False):
             iris_list.append(self._decode(bytes(iris_raw), self._cfg.iris_h, self._cfg.iris_w))
             fp_list.append(self._decode(bytes(fp_raw), self._cfg.fp_h, self._cfg.fp_w))
 
         result = dict(batch)
-        result["iris"] = np.stack(iris_list, axis=0)          # (B, 1, H, W)
-        result["fingerprint"] = np.stack(fp_list, axis=0)     # (B, 1, H, W)
+        result["iris"] = np.stack(iris_list, axis=0)  # (B, 1, H, W)
+        result["fingerprint"] = np.stack(fp_list, axis=0)  # (B, 1, H, W)
         return result
 
     def _decode(self, raw: bytes, h: int, w: int) -> np.ndarray:

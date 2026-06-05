@@ -24,6 +24,13 @@ adas-ingest        = "adas_infra.cli.ingest:main"
 adas-serve         = "adas_infra.cli.serve:main"
 adas-publish-model = "adas_infra.cli.publish_model:main"
 
+[tool.uv.sources]
+adas-infra-core = { workspace = true }
+adas-infra-data = { workspace = true }
+adas-infra-train = { workspace = true }
+adas-infra-serve = { workspace = true }
+adas-infra-obs = { workspace = true }
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/adas_infra"]
 

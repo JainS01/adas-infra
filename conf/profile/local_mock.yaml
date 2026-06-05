@@ -1,6 +1,10 @@
+# @package _global_
 # local_mock profile — judge path, no cloud account, no GPU required.
 # Every cloud adapter is replaced with a local twin behind the same contract.
-# Activated by default or via: +profile=local_mock
+# Activated by default, or switch with: profile=cloud_prod
+#
+# `@package _global_` makes the `override /group` directives below apply to the
+# global config groups rather than being namespaced under `profile.`.
 
 # Override defaults to local implementations
 defaults:

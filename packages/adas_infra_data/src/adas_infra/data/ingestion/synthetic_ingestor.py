@@ -82,7 +82,7 @@ class SyntheticIngestor:
 
             if not path.exists():
                 table = self._build_table(range(start, end), shard_id)
-                pq.write_table(table, path, compression="snappy")
+                pq.write_table(table, path, compression="snappy")  # type: ignore[no-untyped-call]
                 logger.debug("Wrote shard %s → %s (%d rows)", shard_id, path, len(table))
 
             self._shard_paths[shard_id] = path
@@ -95,7 +95,7 @@ class SyntheticIngestor:
         tables: list[pa.Table] = []
         for sid in shard_ids:
             path = self._resolve_shard(sid)
-            tables.append(pq.read_table(path, schema=BIOMETRIC_ARROW_SCHEMA))
+            tables.append(pq.read_table(path, schema=BIOMETRIC_ARROW_SCHEMA))  # type: ignore[no-untyped-call]
         if not tables:
             return pa.table({col.name: [] for col in BIOMETRIC_ARROW_SCHEMA})
         return pa.concat_tables(tables)
@@ -110,9 +110,7 @@ class SyntheticIngestor:
     # ── Internal helpers ──────────────────────────────────────────────────────
 
     def _build_table(self, subject_range: range, shard_id: str) -> pa.Table:
-        subject_ids, sample_ids, iris_list, fp_list, labels, splits, shards = (
-            [] for _ in range(7)
-        )
+        subject_ids, sample_ids, iris_list, fp_list, labels, splits, shards = ([] for _ in range(7))
         total_samples = len(subject_range) * self._cfg.samples_per_subject
         n_val = max(1, int(total_samples * _VAL_FRACTION))
         n_test = max(1, int(total_samples * _TEST_FRACTION))

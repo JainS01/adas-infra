@@ -24,9 +24,7 @@ class MissingModalityError(IngestionError):
         self.subject_id = subject_id
         self.modality = modality
         self.path = path
-        super().__init__(
-            f"Missing {modality} for subject '{subject_id}' — expected path: {path}"
-        )
+        super().__init__(f"Missing {modality} for subject '{subject_id}' — expected path: {path}")
 
 
 class ShardNotFoundError(IngestionError):

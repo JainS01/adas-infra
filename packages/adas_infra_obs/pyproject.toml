@@ -16,6 +16,9 @@ dependencies = [
 gpu = ["pynvml>=11.5.0"]
 otel = ["opentelemetry-api>=1.25.0", "opentelemetry-sdk>=1.25.0"]
 
+[tool.uv.sources]
+adas-infra-core = { workspace = true }
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/adas_infra"]
 

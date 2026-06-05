@@ -12,7 +12,6 @@ the hook raises ReproducibilityError which aborts the run.
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -80,11 +79,24 @@ class RunManifestHook(TrainingHook):
         try:
             import mlflow
 
-            run_id = self._mlflow_run_id or manifest.run_id
-            client = mlflow.tracking.MlflowClient()
             tags = manifest.as_mlflow_tags()
-            for key, value in tags.items():
-                client.set_tag(run_id, key, value)
+            if self._mlflow_run_id:
+                # Caller owns the run lifecycle — tag the existing run directly.
+                client = mlflow.tracking.MlflowClient()
+                for key, value in tags.items():
+                    client.set_tag(self._mlflow_run_id, key, value)
+                run_id = self._mlflow_run_id
+            else:
+                # No run supplied: the manifest.run_id is our own short id, not an
+                # MLflow run id, so we must create the run before tagging it.
+                # Co-locate the tracking store with the checkpoints so the local
+                # pipeline keeps the working tree clean. The filesystem backend
+                # (file:./mlruns) is in maintenance mode and rejected by MLflow
+                # >=3.x, so use the SQLite backend it recommends instead.
+                db_path = (self._ckpt_dir.parent / "mlflow.db").resolve()
+                mlflow.set_tracking_uri(f"sqlite:///{db_path}")
+                with mlflow.start_run(run_name=f"run_{manifest.run_id}", tags=tags) as run:
+                    run_id = run.info.run_id
             logger.info("RunManifestHook: set %d MLflow tags on run %s", len(tags), run_id)
         except (ImportError, OSError, RuntimeError) as exc:
             raise ReproducibilityError(f"Cannot write MLflow tags: {exc}") from exc

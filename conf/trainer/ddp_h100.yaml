@@ -1,4 +1,6 @@
-# DDP engine on H100 cluster.
+# H100-cluster hyperparameters (large batch / long schedule). A dedicated DDP engine is a
+# planned BaseTrainer subclass; until it exists this profile reuses SingleDeviceEngine so the
+# config composes and the hyperparameters live in one place.
 _target_: adas_infra.train.engines.single_device_engine.SingleDeviceEngine
 seed: 42
 max_steps: 10000

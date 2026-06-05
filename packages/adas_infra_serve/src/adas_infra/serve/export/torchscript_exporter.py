@@ -55,15 +55,15 @@ class TorchScriptExporter:
 
         try:
             with torch.no_grad():
-                traced = torch.jit.trace(model_cpu, (dummy_iris, dummy_fp))
+                traced = torch.jit.trace(model_cpu, (dummy_iris, dummy_fp))  # type: ignore[no-untyped-call]
         except Exception as exc:
             raise CheckpointError(f"TorchScript trace failed: {exc}") from exc
 
         if validate:
             with torch.no_grad():
                 out = traced(dummy_iris, dummy_fp)
-            expected_dim = model_cpu.num_classes if hasattr(model_cpu, "num_classes") else -1
-            if expected_dim > 0 and out.shape[-1] != expected_dim:
+            expected_dim = getattr(model_cpu, "num_classes", -1)
+            if isinstance(expected_dim, int) and expected_dim > 0 and out.shape[-1] != expected_dim:
                 raise CheckpointError(
                     f"Traced model output dim {out.shape[-1]} != expected {expected_dim}"
                 )
@@ -77,6 +77,6 @@ class TorchScriptExporter:
     def load(path: Path, device: torch.device | None = None) -> torch.jit.ScriptModule:
         """Load a TorchScript archive for inference."""
         dev = device or torch.device("cpu")
-        model = torch.jit.load(str(path), map_location=dev)
+        model = torch.jit.load(str(path), map_location=dev)  # type: ignore[no-untyped-call]
         model.eval()
-        return model
+        return model  # type: ignore[no-any-return]

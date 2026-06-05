@@ -6,7 +6,7 @@ pace with the training step.  The Grafana SLO dashboard alerts when p99 > 0.5s.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from prometheus_client import CollectorRegistry, Histogram
 

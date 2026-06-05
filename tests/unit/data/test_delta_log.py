@@ -15,7 +15,13 @@ class TestDeltaLog:
     def test_append_increments_offset(self, tmp_path: Path):
         wal = DeltaLog(wal_dir=tmp_path)
         assert wal.offset == 0
-        r1 = DeltaRecord(shard_id="s1", operation=DeltaOperation.ADD, path="p1", byte_size=10, num_rows=5)
+        r1 = DeltaRecord(
+            shard_id="s1",
+            operation=DeltaOperation.ADD,
+            path="p1",
+            byte_size=10,
+            num_rows=5,
+        )
         wal.append(r1)
         assert wal.offset == 1
         wal.append(r1)
@@ -24,7 +30,13 @@ class TestDeltaLog:
     def test_replay_returns_all_records(self, tmp_path: Path):
         wal = DeltaLog(wal_dir=tmp_path)
         records = [
-            DeltaRecord(shard_id=f"s{i}", operation=DeltaOperation.ADD, path=f"p{i}", byte_size=i, num_rows=i)
+            DeltaRecord(
+                shard_id=f"s{i}",
+                operation=DeltaOperation.ADD,
+                path=f"p{i}",
+                byte_size=i,
+                num_rows=i,
+            )
             for i in range(5)
         ]
         for r in records:
@@ -36,14 +48,28 @@ class TestDeltaLog:
     def test_replay_from_offset(self, tmp_path: Path):
         wal = DeltaLog(wal_dir=tmp_path)
         for i in range(6):
-            wal.append(DeltaRecord(shard_id=f"s{i}", operation=DeltaOperation.ADD, path=f"p{i}", byte_size=0, num_rows=0))
+            wal.append(
+                DeltaRecord(
+                    shard_id=f"s{i}",
+                    operation=DeltaOperation.ADD,
+                    path=f"p{i}",
+                    byte_size=0,
+                    num_rows=0,
+                )
+            )
         tail = wal.replay(from_offset=3)
         assert len(tail) == 3
         assert tail[0].shard_id == "s3"
 
     def test_corruption_raises_error(self, tmp_path: Path):
         wal = DeltaLog(wal_dir=tmp_path)
-        r = DeltaRecord(shard_id="s1", operation=DeltaOperation.ADD, path="p1", byte_size=0, num_rows=0)
+        r = DeltaRecord(
+            shard_id="s1",
+            operation=DeltaOperation.ADD,
+            path="p1",
+            byte_size=0,
+            num_rows=0,
+        )
         wal.append(r)
 
         # Corrupt the WAL file
@@ -59,7 +85,15 @@ class TestDeltaLog:
         """Offset is recovered by counting lines on re-open."""
         wal1 = DeltaLog(wal_dir=tmp_path)
         for i in range(3):
-            wal1.append(DeltaRecord(shard_id=f"s{i}", operation=DeltaOperation.ADD, path="p", byte_size=0, num_rows=0))
+            wal1.append(
+                DeltaRecord(
+                    shard_id=f"s{i}",
+                    operation=DeltaOperation.ADD,
+                    path="p",
+                    byte_size=0,
+                    num_rows=0,
+                )
+            )
 
         wal2 = DeltaLog(wal_dir=tmp_path)
         assert wal2.offset == 3

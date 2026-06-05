@@ -15,6 +15,10 @@ dependencies = [
     "numpy>=1.26.0",
 ]
 
+[tool.uv.sources]
+adas-infra-core = { workspace = true }
+adas-infra-data = { workspace = true }
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/adas_infra"]
 

@@ -15,8 +15,9 @@ from __future__ import annotations
 import logging
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from adas_infra.core.contracts.manifest_store import BaseManifestStore
 from adas_infra.core.schemas.delta_record import DeltaOperation, DeltaRecord
@@ -41,7 +42,7 @@ INSERT OR IGNORE INTO wal_meta (key, value) VALUES ('wal_offset', '0');
 """
 
 
-class ManifestStoreSQLite(BaseManifestStore):
+class ManifestStoreSQLite(BaseManifestStore):  # type: ignore[misc]
     """Thread-safe SQLite manifest store for the local_mock profile."""
 
     def __init__(self, db_path: str = "./state/manifest.db", **kwargs: object) -> None:
@@ -83,20 +84,27 @@ class ManifestStoreSQLite(BaseManifestStore):
             "SELECT shard_id, path, byte_size, num_rows, ingested, ingested_at "
             "FROM shards WHERE ingested = 0"
         ).fetchall()
-        return [
-            ShardManifestEntry(
-                shard_id=r[0],
-                path=r[1],
-                byte_size=r[2],
-                num_rows=r[3],
-                ingested=bool(r[4]),
-                ingested_at=datetime.fromisoformat(r[5]) if r[5] else None,
-            )
-            for r in rows
-        ]
+        return [self._row_to_entry(r) for r in rows]
+
+    def get_all_shards(self) -> list[ShardManifestEntry]:
+        rows = self._conn.execute(
+            "SELECT shard_id, path, byte_size, num_rows, ingested, ingested_at FROM shards"
+        ).fetchall()
+        return [self._row_to_entry(r) for r in rows]
+
+    @staticmethod
+    def _row_to_entry(r: tuple[Any, ...]) -> ShardManifestEntry:
+        return ShardManifestEntry(
+            shard_id=r[0],
+            path=r[1],
+            byte_size=r[2],
+            num_rows=r[3],
+            ingested=bool(r[4]),
+            ingested_at=datetime.fromisoformat(r[5]) if r[5] else None,
+        )
 
     def mark_ingested(self, shard_ids: list[str]) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._lock, self._conn:
             self._conn.executemany(
                 "UPDATE shards SET ingested=1, ingested_at=? WHERE shard_id=?",
@@ -104,9 +112,7 @@ class ManifestStoreSQLite(BaseManifestStore):
             )
 
     def get_wal_offset(self) -> int:
-        row = self._conn.execute(
-            "SELECT value FROM wal_meta WHERE key='wal_offset'"
-        ).fetchone()
+        row = self._conn.execute("SELECT value FROM wal_meta WHERE key='wal_offset'").fetchone()
         return int(row[0]) if row else 0
 
     def close(self) -> None:

@@ -6,3 +6,7 @@ ingestor: iris_fingerprint
 root: ${oc.env:ADAS_DATA_ROOT,./data/kaggle}
 num_shards: 32
 seed: 42
+
+# incremental (default): ingest only pending/new shards, preserving warm Plasma caches.
+# full_scan: reprocess every known shard (cold-start / reprocessing).
+merge_strategy: incremental

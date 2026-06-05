@@ -32,16 +32,15 @@ class SchemaGuard:
         actual = set(table.schema.names)
         missing = _REQUIRED_COLUMNS - actual
         if missing:
-            raise IngestionError(
-                f"Table from '{source}' is missing columns: {sorted(missing)}"
-            )
+            raise IngestionError(f"Table from '{source}' is missing columns: {sorted(missing)}")
 
     @staticmethod
     def _check_version(table: pa.Table, source: str) -> None:
         if "schema_version" not in table.schema.names:
             return
         import pyarrow.compute as pc
-        max_ver = pc.max(table.column("schema_version")).as_py()
+
+        max_ver = pc.max(table.column("schema_version")).as_py()  # type: ignore[attr-defined]
         if max_ver is not None and max_ver > CURRENT_VERSION:
             raise SchemaVersionError(
                 found=int(max_ver),
@@ -52,10 +51,11 @@ class SchemaGuard:
     @staticmethod
     def _check_non_empty_bytes(table: pa.Table, source: str) -> None:
         import pyarrow.compute as pc
+
         for col in ("iris_bytes", "fingerprint_bytes"):
             if col not in table.schema.names:
                 continue
-            null_count = pc.sum(pc.is_null(table.column(col))).as_py()
+            null_count = pc.sum(pc.is_null(table.column(col))).as_py()  # type: ignore[attr-defined]
             if null_count and null_count > 0:
                 raise IngestionError(
                     f"Table from '{source}': column '{col}' contains {null_count} null(s)"

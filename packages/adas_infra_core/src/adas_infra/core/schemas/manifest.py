@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -40,7 +40,7 @@ class RunManifest(BaseModel):
     num_classes: int = Field(ge=1)
     max_steps: int = Field(ge=1)
     best_val_loss: float | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     extra_tags: dict[str, str] = Field(default_factory=dict)
 
     def as_mlflow_tags(self) -> dict[str, str]:

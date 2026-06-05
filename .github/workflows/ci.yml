@@ -15,49 +15,68 @@ jobs:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           version: "latest"
 
-      - name: Install dependencies
-        run: uv sync
+      - name: Install dependencies (All Workspace Packages)
+        run: uv sync --all-packages
 
       - name: Ruff lint
+        # Full ruleset from pyproject.toml (E,F,I,N,UP,ANN,S,B,A,C4,PT,RUF) — no
+        # per-run --ignore. The lint gate must match the local config exactly.
         run: uv run ruff check packages/ tests/ scripts/
 
       - name: Ruff format check
         run: uv run ruff format --check packages/ tests/ scripts/
 
       - name: Bandit security scan
-        run: uv run bandit -r packages/ -c pyproject.toml -q
+        run: uv run bandit -r packages/ -q -s B101
 
       - name: Gitleaks secret scan
-        uses: gitleaks/gitleaks-action@v2
+        # Gates the build. False positives (the mock connection strings in
+        # conf/.env.example) are handled by the allowlist in .gitleaks.toml,
+        # not by swallowing the exit code.
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: ${{ github.workspace }}/.gitleaks.toml
 
   type-check:
     name: MyPy type check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
           version: "latest"
-      - run: uv sync
-      - run: uv run mypy packages/adas_infra_core/src packages/adas_infra_data/src packages/adas_infra_train/src --config-file mypy.ini
+
+      - name: Install dependencies with workspace awareness
+        run: uv sync --all-packages
+
+      - name: Run MyPy across workspace source files
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/packages/adas_infra_core:$(pwd)/packages/adas_infra_data:$(pwd)/packages/adas_infra_train
+          uv run mypy packages/ --config-file mypy.ini --explicit-package-bases --ignore-missing-imports
 
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
           version: "latest"
-      - run: uv sync
-      - name: Run unit tests
-        run: uv run pytest tests/unit/ -v --tb=short --timeout=60
+
+      - name: Install dependencies and compile workspace
+        run: uv sync --all-packages
+
+      - name: Run unit tests with local path resolution
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/packages/adas_infra_core:$(pwd)/packages/adas_infra_data:$(pwd)/packages/adas_infra_train
+          uv run pytest tests/unit/ -v --tb=short --timeout=60

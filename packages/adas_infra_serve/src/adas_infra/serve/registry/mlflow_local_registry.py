@@ -1,8 +1,10 @@
-"""MLflowLocalRegistry — local file-based model registry (local_mock profile).
+"""MLflowLocalRegistry — local model registry (local_mock profile).
 
-Uses MLflow Tracking (file:./mlruns) as the backing store.  This mirrors the
-AzureMLRegistry interface exactly; downstream consumers bind to BaseModelRegistry
-and never reference either concrete class.
+Uses MLflow Tracking (sqlite:///mlflow.db) as the backing store.  The filesystem
+backend is in maintenance mode and rejected by MLflow >=3.x, and the model
+registry has always required a database backend, so SQLite is used.  This mirrors
+the AzureMLRegistry interface exactly; downstream consumers bind to
+BaseModelRegistry and never reference either concrete class.
 
 The run_manifest is persisted as MLflow tags on every registered model version
 so the (git_sha, config_hash, delta_offset, profile) 4-tuple is always auditable.
@@ -25,10 +27,18 @@ from adas_infra.core.schemas.manifest import RunManifest
 logger = logging.getLogger(__name__)
 
 
-class MLflowLocalRegistry(BaseModelRegistry):
-    """Stores model artifacts in the local MLflow tracking server (file://./mlruns)."""
+class MLflowLocalRegistry(BaseModelRegistry):  # type: ignore[misc]
+    """Stores model artifacts in the local MLflow tracking store (sqlite:///mlflow.db)."""
 
-    def __init__(self, tracking_uri: str = "file:./mlruns", **kwargs: Any) -> None:
+    def __init__(self, tracking_uri: str = "sqlite:///mlflow.db", **kwargs: Any) -> None:
+        # A SQLite backend defaults artifacts to ./mlruns under the cwd; co-locate
+        # them with the DB instead so the working tree stays clean. Ensure the
+        # parent dir exists so SQLite can create the file on first connection.
+        self._artifact_root: str | None = None
+        if tracking_uri.startswith("sqlite:///"):
+            db_path = Path(tracking_uri.removeprefix("sqlite:///"))
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            self._artifact_root = (db_path.parent / "artifacts").as_uri()
         mlflow.set_tracking_uri(tracking_uri)
         self._client = MlflowClient(tracking_uri=tracking_uri)
         self._tracking_uri = tracking_uri
@@ -44,26 +54,30 @@ class MLflowLocalRegistry(BaseModelRegistry):
 
         Returns the model URI: models:/<name>/<version>
         """
+        from adas_infra.serve.export.torchscript_exporter import TorchScriptExporter
+
         experiment_name = f"adas-{manifest.model_name}"
+        if self._artifact_root and self._client.get_experiment_by_name(experiment_name) is None:
+            self._client.create_experiment(experiment_name, artifact_location=self._artifact_root)
         mlflow.set_experiment(experiment_name)
+        tags = manifest.as_mlflow_tags()
 
-        with mlflow.start_run(run_name=f"run_{manifest.run_id}") as run:
-            mlflow_run_id = run.info.run_id
-
-            for key, value in manifest.as_mlflow_tags().items():
+        with mlflow.start_run(run_name=f"run_{manifest.run_id}"):
+            for key, value in tags.items():
                 mlflow.set_tag(key, value)
 
             if metadata:
                 mlflow.log_params({k: str(v) for k, v in metadata.items()})
 
-            artifact_path = "model"
-            mlflow.log_artifact(str(model_path), artifact_path=artifact_path)
+            # MLflow 3.x registers from a first-class *logged model*, not a raw
+            # artifact, so load the TorchScript archive and log it as one.
+            scripted = TorchScriptExporter.load(model_path)
+            model_info = mlflow.pytorch.log_model(scripted, name="model")
 
-            artifact_uri = f"runs:/{mlflow_run_id}/{artifact_path}"
             model_version = mlflow.register_model(
-                model_uri=artifact_uri,
+                model_uri=model_info.model_uri,
                 name=manifest.model_name,
-                tags=manifest.as_mlflow_tags(),
+                tags=tags,
             )
 
         version_uri = f"models:/{manifest.model_name}/{model_version.version}"

@@ -12,12 +12,14 @@ changes.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
 from pathlib import Path
 
 from adas_infra.core.errors import DeltaLogCorruptionError
+from adas_infra.core.schemas._versioning import read_versioned
 from adas_infra.core.schemas.delta_record import DeltaRecord
 
 logger = logging.getLogger(__name__)
@@ -79,7 +81,9 @@ class DeltaLog:
                 if record_count < from_offset:
                     record_count += 1
                     continue
-                record = DeltaRecord.model_validate_json(raw)
+                # Readers upcast through the migration chain so a WAL written by an
+                # older build still parses after a DeltaRecord schema bump.
+                record = read_versioned(DeltaRecord, json.loads(raw))
                 if not record.verify():
                     raise DeltaLogCorruptionError(
                         f"Checksum mismatch at WAL record {record_count}: shard={record.shard_id}"

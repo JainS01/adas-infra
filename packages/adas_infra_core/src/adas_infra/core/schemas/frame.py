@@ -16,11 +16,11 @@ BIOMETRIC_ARROW_SCHEMA: pa.Schema = pa.schema(
         pa.field("schema_version", pa.int32()),
         pa.field("subject_id", pa.string()),
         pa.field("sample_id", pa.string()),
-        pa.field("iris_bytes", pa.binary()),       # raw image bytes (JPEG / PNG)
+        pa.field("iris_bytes", pa.binary()),  # raw image bytes (JPEG / PNG)
         pa.field("fingerprint_bytes", pa.binary()),
-        pa.field("label", pa.int64()),             # subject ordinal for classification
-        pa.field("split", pa.string()),            # "train" | "val" | "test"
-        pa.field("source_shard", pa.string()),     # shard_id that provided this row
+        pa.field("label", pa.int64()),  # subject ordinal for classification
+        pa.field("split", pa.string()),  # "train" | "val" | "test"
+        pa.field("source_shard", pa.string()),  # shard_id that provided this row
     ],
     metadata={"schema_name": "BiometricFrame", "schema_version": str(CURRENT_VERSION)},
 )

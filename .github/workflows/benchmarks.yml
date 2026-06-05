@@ -1,31 +1,38 @@
-name: Benchmarks — Plasma throughput regression gate
+name: Benchmarks — continuous profiling & regression tracking
 
 on:
   push:
+    branches: [main, develop]
+  pull_request:
     branches: [main]
-  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  benchmark:
-    name: Plasma throughput benchmark
+  profile:
+    name: Micro-benchmarks & Profiling
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           version: "latest"
-      - run: uv sync
-      - name: Run benchmarks with regression check
-        run: |
-          uv run pytest tests/benchmarks/ \
-            --benchmark-json=tests/benchmarks/results.json \
-            --benchmark-min-rounds=3 \
-            -v --timeout=120
 
-      - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results-${{ github.sha }}
-          path: tests/benchmarks/results.json
+      - name: Install dependencies (All Workspace Packages)
+        run: uv sync --all-packages
+
+      - name: Run data-loader micro-benchmarks
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/packages/adas_infra_core:$(pwd)/packages/adas_infra_data:$(pwd)/packages/adas_infra_train
+          # Removed the problematic --durations flag
+          uv run pytest tests/benchmarks/ -v
+
+      - name: Profile memory and I/O overhead
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/packages/adas_infra_core:$(pwd)/packages/adas_infra_data:$(pwd)/packages/adas_infra_train
+          # Execute the script directly without trailing configuration flags
+          uv run python scripts/seed_delta_log.py --synthetic

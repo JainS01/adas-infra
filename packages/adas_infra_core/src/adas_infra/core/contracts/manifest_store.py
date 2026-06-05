@@ -25,6 +25,13 @@ class BaseManifestStore(abc.ABC):
         """Return all shards not yet confirmed as ingested in the current epoch."""
 
     @abc.abstractmethod
+    def get_all_shards(self) -> list[ShardManifestEntry]:
+        """Return every shard known to the store, regardless of ingestion status.
+
+        Used by the full-scan merge strategy for cold-start / reprocessing.
+        """
+
+    @abc.abstractmethod
     def mark_ingested(self, shard_ids: list[str]) -> None:
         """Atomically mark a list of shards as successfully ingested."""
 

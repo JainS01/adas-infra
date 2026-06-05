@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -13,7 +13,7 @@ from adas_infra.core.schemas._versioning import versioned_schema
 CURRENT_VERSION = 1
 
 
-class DeltaOperation(str, Enum):
+class DeltaOperation(StrEnum):
     ADD = "ADD"
     REMOVE = "REMOVE"
     UPDATE = "UPDATE"
@@ -34,10 +34,10 @@ class DeltaRecord(BaseModel):
     byte_size: int = Field(ge=0)
     num_rows: int = Field(ge=0)
     checksum: str = Field(default="")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @model_validator(mode="after")
-    def _compute_checksum(self) -> "DeltaRecord":
+    def _compute_checksum(self) -> DeltaRecord:
         if not self.checksum:
             payload = f"{self.shard_id}:{self.operation}:{self.path}".encode()
             self.checksum = hashlib.sha256(payload).hexdigest()

@@ -40,7 +40,7 @@ class PluginRegistry:
                 f"_target_ '{target_str}' resolved to {type(instance).__name__}, "
                 f"expected {expected_type.__name__}"
             )
-        return instance  # type: ignore[return-value]
+        return instance  # type: ignore[no-any-return]
 
     @staticmethod
     def _import(dotted_path: str) -> type:

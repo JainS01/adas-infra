@@ -1,5 +1,5 @@
 """Model implementations."""
 
-from adas_infra.train.models.fusion_baseline import FusionBaseline, IrisEncoder, FingerprintEncoder
+from adas_infra.train.models.fusion_baseline import FingerprintEncoder, FusionBaseline, IrisEncoder
 
-__all__ = ["FusionBaseline", "IrisEncoder", "FingerprintEncoder"]
+__all__ = ["FingerprintEncoder", "FusionBaseline", "IrisEncoder"]

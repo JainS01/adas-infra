@@ -3,7 +3,6 @@
 
 defaults:
   - _self_
-  - profile: local_mock        # Switch to cloud_prod for Azure
   - data: synthetic_local      # Dataset configuration
   - model: fusion_baseline     # Model architecture
   - trainer: single_node_debug # Training engine
@@ -13,6 +12,9 @@ defaults:
   - serve: local_fastapi       # Inference endpoint
   - registry: mlflow_local     # Model registry
   - observability: prometheus  # Metrics configuration
+  # Profile is composed last so its `override /group` entries apply on top of
+  # the group defaults above. Switch to cloud_prod for Azure.
+  - profile: local_mock
 
 # Global seed for reproducibility
 seed: 42

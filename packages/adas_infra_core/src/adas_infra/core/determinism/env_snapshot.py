@@ -7,7 +7,7 @@ import importlib.metadata
 import json
 import os
 import platform
-import subprocess
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 
@@ -15,7 +15,7 @@ from pathlib import Path
 def git_sha(repo_root: Path | None = None) -> str:
     """Return the current HEAD SHA, or 'no-git' if git is unavailable."""
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec
             ["git", "rev-parse", "HEAD"],
             capture_output=True,
             text=True,

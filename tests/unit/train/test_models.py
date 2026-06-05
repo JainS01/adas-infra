@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import torch
-import pytest
 
-from adas_infra.train.models.fusion_baseline import FusionBaseline, IrisEncoder, FingerprintEncoder
+from adas_infra.train.models.fusion_baseline import FingerprintEncoder, FusionBaseline, IrisEncoder
 
 
 class TestIrisEncoder:
@@ -65,6 +64,17 @@ class TestFusionBaseline:
         loss.backward()
         for name, param in model.named_parameters():
             assert param.grad is not None, f"No gradient for {name}"
+
+    def test_train_mode_handles_batch_size_one(self):
+        # Regression: BatchNorm1d in the fusion head crashed on B=1 in train mode.
+        # LayerNorm makes the head batch-size-independent.
+        model = FusionBaseline(num_classes=5)
+        model.train()
+        iris = torch.randn(1, 1, 64, 64)
+        fp = torch.randn(1, 1, 96, 96)
+        logits = model(iris, fp)
+        assert logits.shape == (1, 5)
+        assert not torch.isnan(logits).any()
 
     def test_eval_mode_no_grad_same_output(self):
         model = FusionBaseline(num_classes=5)

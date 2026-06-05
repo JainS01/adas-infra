@@ -45,8 +45,11 @@ class LocalParquetIngestor:
             path = self._root / f"{sid}.parquet"
             if not path.exists():
                 raise ShardNotFoundError(shard_id=sid, location=str(self._root))
-            tables.append(pq.read_table(path, schema=BIOMETRIC_ARROW_SCHEMA))
+            tables.append(pq.read_table(path, schema=BIOMETRIC_ARROW_SCHEMA))  # type: ignore[no-untyped-call]
             logger.debug("Loaded shard %s (%d rows)", sid, len(tables[-1]))
         if not tables:
-            return pa.table({f.name: [] for f in BIOMETRIC_ARROW_SCHEMA}, schema=BIOMETRIC_ARROW_SCHEMA)
+            return pa.table(
+                {f.name: [] for f in BIOMETRIC_ARROW_SCHEMA},
+                schema=BIOMETRIC_ARROW_SCHEMA,
+            )
         return pa.concat_tables(tables)

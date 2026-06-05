@@ -1,3 +1,6 @@
-# MLflow local file-based registry (local_mock profile).
+# MLflow local SQLite-backed registry (local_mock profile).
+# The filesystem backend (file:./mlruns) is in maintenance mode and rejected by
+# MLflow >=3.x, and the model registry requires a database backend, so SQLite is
+# used. The DB and artifacts are co-located under ./mlruns/.
 _target_: adas_infra.serve.registry.mlflow_local_registry.MLflowLocalRegistry
-tracking_uri: file:./mlruns
+tracking_uri: sqlite:///./mlruns/mlflow.db

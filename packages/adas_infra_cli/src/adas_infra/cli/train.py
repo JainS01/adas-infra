@@ -15,7 +15,7 @@ The entrypoint wires together:
   4. Ingestor (synthetic or real Kaggle data)
   5. RayDatasetLoader → PlasmaPrefetcher
   6. FusionBaseline model
-  7. SingleDeviceEngine (local) / DDPEngine (cloud)
+  7. SingleDeviceEngine (the one implemented engine; DDP/FSDP are planned subclasses)
   8. TorchScriptExporter → MLflowLocalRegistry
   9. Writes .last_run_id for make judge-quickstart
 """
@@ -23,9 +23,7 @@ The entrypoint wires together:
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
-from typing import Any
 
 import hydra
 import ray
@@ -33,26 +31,34 @@ from omegaconf import DictConfig, OmegaConf
 
 log = logging.getLogger(__name__)
 
+# Absolute path to the repo-root conf/ dir. An absolute path is required because
+# a relative config_path does not resolve through the PEP 660 editable-install
+# import hook when the CLI runs as an installed console script.
+_CONF_DIR = str(Path(__file__).resolve().parents[5] / "conf")
 
-@hydra.main(config_path="../../../../../../../conf", config_name="config", version_base="1.3")
+
+@hydra.main(config_path=_CONF_DIR, config_name="config", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     """Full training pipeline entrypoint."""
     # ── Observability ──────────────────────────────────────────────────────
-    from adas_infra.obs.metrics.registry import register_all
     from adas_infra.obs.exporters.prometheus_exporter import PrometheusExporter
+    from adas_infra.obs.metrics.registry import register_all
 
-    registry = register_all()
+    register_all()
     try:
-        exporter = PrometheusExporter(port=int(OmegaConf.select(cfg, "observability.port", default=9000)))
+        obs_port = int(OmegaConf.select(cfg, "observability.port", default=9000))
+        exporter = PrometheusExporter(port=obs_port)
         exporter.start()
     except Exception as exc:
         log.warning("PrometheusExporter failed to start: %s", exc)
 
     # ── Ray ────────────────────────────────────────────────────────────────
-    ray_cfg = OmegaConf.select(cfg, "ray", default=None)
     num_cpus = int(OmegaConf.select(cfg, "ray.num_cpus", default=2))
     obj_store_mb = int(OmegaConf.select(cfg, "ray.object_store_memory_mb", default=512))
     if not ray.is_initialized():
+        # object_store_memory is sized from config (ray.object_store_memory_mb). The local
+        # default is small on purpose; Ray's "object store is only N% of memory" notice is
+        # expected for the local profile and is tuned up for cloud in conf/ray/.
         ray.init(
             num_cpus=num_cpus,
             object_store_memory=obj_store_mb * 1024 * 1024,
@@ -61,8 +67,8 @@ def main(cfg: DictConfig) -> None:
     log.info("Ray initialised: num_cpus=%d, object_store_memory=%dMB", num_cpus, obj_store_mb)
 
     # ── Delta / manifest ───────────────────────────────────────────────────
-    from adas_infra.data.delta.manifest_store_sqlite import ManifestStoreSQLite
     from adas_infra.data.delta.delta_log import DeltaLog
+    from adas_infra.data.delta.manifest_store_sqlite import ManifestStoreSQLite
     from adas_infra.data.delta.merge_planner import MergePlanner, MergeStrategy
 
     state_dir = Path(OmegaConf.select(cfg, "storage.state_dir", default="./state"))
@@ -90,6 +96,7 @@ def main(cfg: DictConfig) -> None:
         shard_ids = ingestor.generate_shards(num_shards=num_shards)
     else:
         from adas_infra.data.ingestion.iris_fingerprint_ingestor import IrisFingerprintIngestor
+
         ingestor = IrisFingerprintIngestor(dataset_root=str(data_dir))
         shard_ids = ingestor.list_shards()
 
@@ -97,18 +104,29 @@ def main(cfg: DictConfig) -> None:
     from adas_infra.core.schemas.delta_record import DeltaOperation, DeltaRecord
 
     for sid in shard_ids:
-        rec = DeltaRecord(shard_id=sid, operation=DeltaOperation.ADD, path=sid, byte_size=0, num_rows=0)
+        rec = DeltaRecord(
+            shard_id=sid,
+            operation=DeltaOperation.ADD,
+            path=sid,
+            byte_size=0,
+            num_rows=0,
+        )
         wal.append(rec)
         manifest.record_delta(rec)
 
-    planner = MergePlanner(manifest_store=manifest, strategy=MergeStrategy.FULL_SCAN)
+    # Incremental is the production default: only newly-arrived (pending) shards are
+    # ingested, preserving warm Plasma caches. `data.merge_strategy=full_scan` forces
+    # a cold-start reprocess of every known shard. The `or shard_ids` fallback covers
+    # the first run where the manifest is empty / nothing is pending yet.
+    strategy = MergeStrategy(OmegaConf.select(cfg, "data.merge_strategy", default="incremental"))
+    planner = MergePlanner(manifest_store=manifest, strategy=strategy)
     planned_shards = planner.plan() or shard_ids
 
     # ── Load data ──────────────────────────────────────────────────────────
-    import pyarrow as pa
-    from adas_infra.data.validation.schema_guard import SchemaGuard
-    from adas_infra.data.loaders.ray_dataset_loader import RayDatasetLoader
+
     from adas_infra.data.loaders.plasma_prefetcher import PlasmaPrefetcher
+    from adas_infra.data.loaders.ray_dataset_loader import RayDatasetLoader
+    from adas_infra.data.validation.schema_guard import SchemaGuard
     from adas_infra.obs.metrics.dataloader_lag import make_callback
 
     table = ingestor.ingest(planned_shards)
@@ -129,9 +147,10 @@ def main(cfg: DictConfig) -> None:
 
     # ── Build model ────────────────────────────────────────────────────────
     import pyarrow.compute as pc
+
     from adas_infra.train.models.fusion_baseline import FusionBaseline
 
-    num_classes = int(pc.max(table.column("label")).as_py()) + 1
+    num_classes = int(pc.max(table.column("label")).as_py()) + 1  # type: ignore[attr-defined]
     model_cfg_num_classes = OmegaConf.select(cfg, "model.num_classes", default=num_classes)
 
     model = FusionBaseline(
@@ -144,6 +163,8 @@ def main(cfg: DictConfig) -> None:
     from adas_infra.train.engines.single_device_engine import SingleDeviceEngine
 
     engine = SingleDeviceEngine(cfg=cfg)
+    # Stamp the data-version axis of the reproducibility tuple with the live WAL offset.
+    engine.set_data_provenance(delta_log_offset=manifest.get_wal_offset())
     manifest_result = engine.fit(
         model=model,
         train_data=train_prefetcher,
@@ -159,7 +180,7 @@ def main(cfg: DictConfig) -> None:
     TorchScriptExporter().export(engine.model or model, dest=model_pt)
 
     reg = MLflowLocalRegistry(
-        tracking_uri=OmegaConf.select(cfg, "registry.tracking_uri", default="file:./mlruns")
+        tracking_uri=OmegaConf.select(cfg, "registry.tracking_uri", default="sqlite:///mlflow.db")
     )
     version_uri = reg.register(model_pt, manifest_result)
     log.info("Registered model: %s", version_uri)

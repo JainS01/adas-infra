@@ -7,3 +7,7 @@ num_subjects: 20
 samples_per_subject: 5
 num_shards: 4
 seed: 42
+
+# incremental (default): ingest only pending/new shards, preserving warm Plasma caches.
+# full_scan: reprocess every known shard (cold-start / reprocessing).
+merge_strategy: incremental

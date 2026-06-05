@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 import hydra
@@ -12,7 +11,7 @@ from omegaconf import DictConfig, OmegaConf
 log = logging.getLogger(__name__)
 
 
-@hydra.main(config_path="../../../../../../../conf", config_name="config", version_base="1.3")
+@hydra.main(config_path="../../../../../conf", config_name="config", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     model_path = OmegaConf.select(cfg, "serve.model_path", default=None)
     if model_path is None:
@@ -26,4 +25,5 @@ def main(cfg: DictConfig) -> None:
     log.info("Starting inference server: model=%s port=%d", model_path, port)
 
     from adas_infra.serve.inference.local_fastapi_endpoint import serve
+
     serve(model_path=str(model_path), port=port)

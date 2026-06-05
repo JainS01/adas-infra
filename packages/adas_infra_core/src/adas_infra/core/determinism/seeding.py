@@ -27,6 +27,9 @@ def seed_everything(seed: int, *, deterministic_cudnn: bool = True) -> None:
         if deterministic_cudnn:
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
+            # Enforce deterministic kernels across all ops; warn_only avoids hard
+            # failures on the few ops without a deterministic implementation.
+            torch.use_deterministic_algorithms(True, warn_only=True)
     except ImportError:
         pass
 
@@ -38,3 +41,9 @@ def worker_init_fn(worker_id: int) -> None:
     ) % (2**31)
     random.seed(worker_seed)
     np.random.seed(worker_seed)
+    try:
+        import torch
+
+        torch.manual_seed(worker_seed)
+    except ImportError:
+        pass

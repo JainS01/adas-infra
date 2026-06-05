@@ -44,9 +44,9 @@ obs-down:
 
 # ── Judge quickstart (no cloud, no GPU, one command) ─────────────────────────
 judge-quickstart: seed
-	$(UV) run adas-train +profile=local_mock trainer.max_steps=50
+	$(UV) run adas-train trainer.max_steps=50
 	$(UV) run adas-publish-model --run-id $$(cat .last_run_id 2>/dev/null || echo "latest")
-	curl -sf http://localhost:8080/health || ($(UV) run adas-serve +profile=local_mock &); sleep 3
+	curl -sf http://localhost:8080/health || ($(UV) run adas-serve &); sleep 3
 	curl -sf http://localhost:8080/predict -H "Content-Type: application/json" \
 	     -d @tests/e2e/sample.json | python -m json.tool
 

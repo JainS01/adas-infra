@@ -18,9 +18,7 @@ def build_scheduler(
     warmup = optim.lr_scheduler.LinearLR(
         optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_steps
     )
-    cosine = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=max(1, max_steps - warmup_steps)
-    )
+    cosine = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, max_steps - warmup_steps))
     return optim.lr_scheduler.SequentialLR(
         optimizer, schedulers=[warmup, cosine], milestones=[warmup_steps]
     )
